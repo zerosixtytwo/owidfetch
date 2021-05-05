@@ -17,6 +17,8 @@ type Config struct {
 
 	DBDSN string `yaml:"DB_DSN"`
 
+	DBTablePrefix string `yaml:"DB_TABLE_PREFIX"`
+
 	/*************************
 	 *    OWID Repository
 	 *************************/
