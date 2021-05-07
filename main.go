@@ -1,6 +1,7 @@
 package main
 
 import (
+	"database/sql"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -12,7 +13,13 @@ import (
 	_ "github.com/go-sql-driver/mysql"
 )
 
-const appVersion = 0.42
+const appVersion = 0.75
+
+type Country struct {
+	CountryCode string
+	Continent   string
+	Name        string
+}
 
 type OWIDReport struct {
 	Continent                         string  `json:"continent"`
@@ -97,11 +104,13 @@ func main() {
 		os.Exit(0)
 	}
 
+	log.Println("Parsing configuration ... ")
 	config, err := parseConfiguration(configFilePath)
 	if err != nil {
 		log.Fatalln(err)
 	}
 
+	log.Println("Configured data source:", config.OWIDDataUrl)
 	log.Print("Configuration is Ok, fetching data from the repository ... ")
 
 	resp, err := http.Get(config.OWIDDataUrl)
@@ -121,5 +130,30 @@ func main() {
 	if err != nil {
 		log.Fatalln(err)
 	}
+	log.Printf("Fetched data for %d countries.", len(*results)-9)
 
+	log.Println("Connecting to database ... ")
+	db, err := sql.Open(config.DBDriverName, config.DBDSN)
+	if err != nil {
+		log.Fatalln(err)
+	}
+	defer db.Close()
+
+	err = db.Ping()
+	if err != nil {
+		log.Fatalln(err)
+	}
+	log.Println("Database connection succeeded.")
+
+	log.Println("Updating tables ... ")
+	err = updateContinentTables(db, results, config)
+	if err != nil {
+		log.Fatalln(err)
+	}
+
+	log.Println("Inserting fetched results ... ")
+	err = insertCountryReports(results, db, config)
+	if err != nil {
+		log.Fatalln(err)
+	}
 }
