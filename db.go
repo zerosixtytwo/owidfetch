@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"log"
 	"strings"
 	"time"
 )
@@ -92,7 +93,8 @@ func createNonExistingContinents(db *sql.DB, conf *Config) error {
 			icu_patients int null,
 			hosp_patients int null,
 
-			foreign key (country_code) references %scountries (code)
+			foreign key (country_code) references %scountries (code),
+			constraint uc_cl unique (country_code, last_updated)
 		)`, conf.DBTablePrefix, tableName, conf.DBTablePrefix)
 
 		_, err = db.Exec(query)
@@ -127,19 +129,78 @@ func insertCountryReports(results *OWIDResults, db *sql.DB, conf *Config) error 
 		return err
 	}
 
+	for countryCode, report := range *results {
+		tableName, err := getTableForCountryCode(countryCode, db, conf)
+		if err != nil {
+			log.Println(err)
+			continue
+		}
+
+		currTime := time.Now()
+		lastUpdated := fmt.Sprintf("%d-%d-%d %d:%d", currTime.Year(), currTime.Month(), currTime.Day(), currTime.Hour(), currTime.Minute())
+		totalCases := fmt.Sprint(report.TotalCases)
+		newCases := fmt.Sprint(report.NewCases)
+		totalDeaths := fmt.Sprint(report.TotalDeaths)
+		newDeaths := fmt.Sprint(report.NewDeaths)
+		totalTests := fmt.Sprint(report.TotalTests)
+		newTests := fmt.Sprint(report.NewTests)
+		totalVaccinations := fmt.Sprint(report.TotalVaccinations)
+		peopleVaccinated := fmt.Sprint(report.PeopleVaccinated)
+		peopleFullyVaccinated := fmt.Sprint(report.PeopleFullyVaccinated)
+		newVaccinations := fmt.Sprint(report.NewVaccinations)
+		icuPatients := fmt.Sprint(report.IcuPatients)
+		hospPatients := fmt.Sprint(report.HospPatients)
+
+		q := "insert into " + tableName + " (country_code,last_updated,total_cases,new_cases,total_deaths,new_deaths,total_tests,new_tests,total_vaccinations,people_vaccinated,people_fully_vaccinated,new_vaccinations,icu_patients,hosp_patients) " +
+			"values ('" + countryCode + "', '" + lastUpdated + "', '" + totalCases + "', '" + newCases + "', '" + totalDeaths + "', '" + newDeaths + "', '" + totalTests + "', '" + newTests + "', '" + totalVaccinations + "', '" + peopleVaccinated + "', '" + peopleFullyVaccinated + "', '" + newVaccinations + "', '" + icuPatients + "', '" + hospPatients + "') " +
+			"on duplicate key update " +
+			"total_cases = '" + totalCases + "', " +
+			"new_cases = '" + newCases + "', " +
+			"total_deaths = '" + totalDeaths + "', " +
+			"new_deaths = '" + newDeaths + "', " +
+			"total_tests = '" + totalTests + "', " +
+			"new_tests = '" + newTests + "', " +
+			"total_vaccinations = '" + totalVaccinations + "', " +
+			"people_vaccinated = '" + peopleVaccinated + "', " +
+			"people_fully_vaccinated = '" + peopleFullyVaccinated + "', " +
+			"new_vaccinations = '" + newVaccinations + "', " +
+			"icu_patients = '" + icuPatients + "', " +
+			"hosp_patients = '" + hospPatients + "' "
+
+		_, err = db.Exec(q)
+		if err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
 
+func getTableForCountryCode(countryCode string, db *sql.DB, conf *Config) (string, error) {
+	query := fmt.Sprintf(`select %scontinent_tables.name from %scontinent_tables
+			inner join %scountries on %scontinent_tables.id = %scountries.continent_table and %scountries.code = ?`, conf.DBTablePrefix, conf.DBTablePrefix, conf.DBTablePrefix, conf.DBTablePrefix, conf.DBTablePrefix, conf.DBTablePrefix)
+
+	row := db.QueryRow(query, countryCode)
+
+	var tableName string
+	err := row.Scan(&tableName)
+	if err != nil {
+		return "", errors.New("failed obtaining the table name for country code: \"" + countryCode + "\"")
+	}
+
+	return conf.DBTablePrefix + tableName, nil
+}
+
 func updateCountries(results *OWIDResults, db *sql.DB, conf *Config) error {
-	countries := extractCountries(results)
+	locations := extractLocations(results)
 
 	presentContinents, err := getContinentTables(db, conf)
 	if err != nil {
 		return err
 	}
 
-	for _, c := range countries {
-		continent := getContinentTableName(c.Continent)
+	for _, loc := range locations {
+		continent := getContinentTableName(loc.Continent)
 		continentId := 0
 
 		for contId, cont := range presentContinents {
@@ -150,13 +211,13 @@ func updateCountries(results *OWIDResults, db *sql.DB, conf *Config) error {
 		}
 
 		if continentId == 0 {
-			return errors.New("no continent found for country " + c.Name)
+			return errors.New("no continent found for country " + loc.Name)
 		}
 
 		query := fmt.Sprintf(`insert into %scountries (code, name, continent_table) values ('%s', '%s', '%d') on duplicate key update code=code`,
 			conf.DBTablePrefix,
-			strings.Replace(c.CountryCode, "'", "\\'", -1),
-			strings.Replace(c.Name, "'", "\\'", -1),
+			strings.Replace(loc.CountryCode, "'", "\\'", -1),
+			strings.Replace(loc.Name, "'", "\\'", -1),
 			continentId)
 
 		_, err = db.Exec(query)

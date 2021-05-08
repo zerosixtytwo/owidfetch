@@ -13,9 +13,9 @@ import (
 	_ "github.com/go-sql-driver/mysql"
 )
 
-const appVersion = 0.75
+const appVersion = 0.95
 
-type Country struct {
+type Location struct {
 	CountryCode string
 	Continent   string
 	Name        string

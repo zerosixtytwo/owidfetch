@@ -12,22 +12,22 @@ func stringSliceContains(subject []string, search string) bool {
 	return false
 }
 
-func extractCountries(results *OWIDResults) []Country {
-	countries := make([]Country, 0)
+func extractLocations(results *OWIDResults) []Location {
+	locations := make([]Location, 0)
 
-	for countryCode, countryData := range *results {
-		if len(countryData.Continent) == 0 {
-			continue
+	for countryCode, locationData := range *results {
+		if len(locationData.Continent) == 0 {
+			locationData.Continent = locationData.Location
 		}
-		c := &Country{
+		c := &Location{
 			CountryCode: countryCode,
-			Continent:   countryData.Continent,
-			Name:        countryData.Location,
+			Continent:   locationData.Continent,
+			Name:        locationData.Location,
 		}
-		countries = append(countries, *c)
+		locations = append(locations, *c)
 	}
 
-	return countries
+	return locations
 }
 
 func getContinentTableName(continent string) string {
