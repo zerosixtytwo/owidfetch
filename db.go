@@ -11,14 +11,11 @@ import (
 
 func updateContinentTables(db *sql.DB, reports *OWIDResults, conf *Config) error {
 	query := fmt.Sprintf(`create table if not exists %scontinent_tables (
-							id int not null primary key AUTO_INCREMENT,
-							name varchar(30) not null
-			  			)`, conf.DBTablePrefix)
+		id int not null primary key AUTO_INCREMENT,
+		name varchar(30) not null
+	)`, conf.DBTablePrefix)
 
-	ctx, canc := context.WithTimeout(context.Background(), 5*time.Second)
-	defer canc()
-
-	_, err := db.ExecContext(ctx, query)
+	_, err := db.Exec(query)
 	if err != nil {
 		return err
 	}
@@ -80,28 +77,25 @@ func createNonExistingContinents(db *sql.DB, conf *Config) error {
 
 	for _, tableName := range continentTables {
 		query := fmt.Sprintf(`create table if not exists %s%s (
-								country_code varchar(10) not null,
-								last_updated varchar(14) not null,
-								total_cases int null,
-								new_cases int null,
-								total_deaths int null,
-								new_deaths int null,
-								total_tests int null,
-								new_tests int null,
-								total_vaccinations int null,
-								people_vaccinated int null,
-								people_fully_vaccinated int null,
-								new_vaccinations int null,
-								icu_patients int null,
-								hosp_patients int null,
+			country_code varchar(10) not null,
+			last_updated varchar(14) not null,
+			total_cases int null,
+			new_cases int null,
+			total_deaths int null,
+			new_deaths int null,
+			total_tests int null,
+			new_tests int null,
+			total_vaccinations int null,
+			people_vaccinated int null,
+			people_fully_vaccinated int null,
+			new_vaccinations int null,
+			icu_patients int null,
+			hosp_patients int null,
 
-								foreign key (country_code) references %scountries (code)
-							)`, conf.DBTablePrefix, tableName, conf.DBTablePrefix)
+			foreign key (country_code) references %scountries (code)
+		)`, conf.DBTablePrefix, tableName, conf.DBTablePrefix)
 
-		ctx, canc := context.WithTimeout(context.Background(), 10*time.Second)
-		defer canc()
-
-		_, err := db.ExecContext(ctx, query)
+		_, err = db.Exec(query)
 		if err != nil {
 			return err
 		}
@@ -112,17 +106,14 @@ func createNonExistingContinents(db *sql.DB, conf *Config) error {
 
 func createCountriesTable(db *sql.DB, conf *Config) error {
 	query := fmt.Sprintf(`create table if not exists %scountries (
-							code varchar(10) not null primary key,
-							name varchar(70) not null,
-							continent_table int not null,
+		code varchar(10) not null primary key,
+		name varchar(70) not null,
+		continent_table int not null,
 
-							foreign key (continent_table) references %scontinent_tables (id)
-						)`, conf.DBTablePrefix, conf.DBTablePrefix)
+		foreign key (continent_table) references %scontinent_tables (id)
+	)`, conf.DBTablePrefix, conf.DBTablePrefix)
 
-	ctx, canc := context.WithTimeout(context.Background(), 5*time.Second)
-	defer canc()
-
-	_, err := db.ExecContext(ctx, query)
+	_, err := db.Exec(query)
 	if err != nil {
 		return err
 	}
@@ -168,10 +159,7 @@ func updateCountries(results *OWIDResults, db *sql.DB, conf *Config) error {
 			strings.Replace(c.Name, "'", "\\'", -1),
 			continentId)
 
-		ctx, canc := context.WithTimeout(context.Background(), 5*time.Second)
-		defer canc()
-
-		_, err := db.ExecContext(ctx, query)
+		_, err = db.Exec(query)
 		if err != nil {
 			return err
 		}
@@ -183,7 +171,7 @@ func updateCountries(results *OWIDResults, db *sql.DB, conf *Config) error {
 func getContinentTables(db *sql.DB, conf *Config) (map[int]string, error) {
 	query := fmt.Sprintf("select * from %scontinent_tables", conf.DBTablePrefix)
 
-	ctx, canc := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, canc := context.WithTimeout(context.Background(), 10*time.Second)
 	defer canc()
 
 	rows, err := db.QueryContext(ctx, query)
