@@ -13,7 +13,7 @@ import (
 	_ "github.com/go-sql-driver/mysql"
 )
 
-const appVersion = 0.96
+const appVersion = 1.00
 
 type Location struct {
 	CountryCode string
@@ -85,6 +85,8 @@ type OWIDReport struct {
 // map[country_code]country_data
 type OWIDResults map[string]OWIDReport
 
+var config *Config
+
 func main() {
 	currentDirectory, err := os.Getwd()
 	if err != nil {
@@ -105,7 +107,7 @@ func main() {
 	}
 
 	log.Println("Parsing configuration ... ")
-	config, err := parseConfiguration(configFilePath)
+	config, err = parseConfiguration(configFilePath)
 	if err != nil {
 		log.Fatalln(err)
 	}
@@ -146,13 +148,13 @@ func main() {
 	log.Println("Database connection succeeded.")
 
 	log.Println("Updating tables ... ")
-	err = updateContinentTables(db, results, config)
+	err = updateContinentTables(db, results)
 	if err != nil {
 		log.Fatalln(err)
 	}
 
 	log.Println("Inserting fetched results ... ")
-	err = insertCountryReports(results, db, config)
+	err = insertCountryReports(results, db)
 	if err != nil {
 		log.Fatalln(err)
 	}
