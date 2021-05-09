@@ -184,9 +184,8 @@ func insertCountryReports(results *OWIDResults, db *sql.DB) error {
 		}
 
 		genericQT.WithValues(&map[string]string{
-			"country_code": countryCode,
-			"table_name":   tableName,
-			//"last_updated":            fmt.Sprintf("%d-%d-%d %d:%d", currTime.Year(), currTime.Month(), currTime.Day(), currTime.Hour(), currTime.Minute()),
+			"country_code":            countryCode,
+			"table_name":              tableName,
 			"total_cases":             fmt.Sprint(report.TotalCases),
 			"new_cases":               fmt.Sprint(report.NewCases),
 			"total_deaths":            fmt.Sprint(report.TotalDeaths),
