@@ -10,27 +10,24 @@ import (
 type QueryTemplate struct {
 	template string
 
-	values map[string]interface{}
+	values map[string]string
 }
 
 func newQueryTemplate(query string) *QueryTemplate {
 	qm := new(QueryTemplate)
 	qm.template = query
-	qm.values = make(map[string]interface{})
+	qm.values = make(map[string]string)
 
 	return qm
 }
 
 func (qm *QueryTemplate) WithValues(m *map[string]string) {
-	if qm.values == nil {
-		qm.values = make(map[string]interface{})
-	}
 	for k, v := range *m {
 		qm.SetValue(k, v)
 	}
 }
 
-func (qm *QueryTemplate) SetValue(name string, value interface{}) {
+func (qm *QueryTemplate) SetValue(name string, value string) {
 	name = "%" + name + "%"
 	qm.values[name] = value
 }
@@ -42,4 +39,8 @@ func (qm *QueryTemplate) Execute() string {
 	}
 
 	return q
+}
+
+func (qm *QueryTemplate) Clear() {
+	qm.values = make(map[string]string)
 }
