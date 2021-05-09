@@ -11,4 +11,4 @@ packing it into easy to parse formats and updating data on a hourly basis
 go to the [OWID](https://github.com/owid) group, thank you for making
 access to crucial information easier.
 _______________________________________________________________________
-__Current version:__ 0.95, __Status:__ Works, but needs some improvements.
+__Current version:__ 0.96, __Status:__ Works, but needs some improvements.

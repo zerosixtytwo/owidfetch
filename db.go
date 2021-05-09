@@ -11,7 +11,7 @@ import (
 )
 
 func updateContinentTables(db *sql.DB, reports *OWIDResults, conf *Config) error {
-	query := fmt.Sprintf(`create table if not exists %scontinent_tables (
+	query := fmt.Sprintf(`create table if not exists %sarea_tables (
 		id int not null primary key AUTO_INCREMENT,
 		name varchar(30) not null
 	)`, conf.DBTablePrefix)
@@ -42,7 +42,7 @@ func updateContinentTables(db *sql.DB, reports *OWIDResults, conf *Config) error
 		continentExists := stringSliceContains(presentContinents, continent)
 
 		if !continentExists {
-			query = fmt.Sprintf(`insert into %scontinent_tables (name) values ('%s')`, conf.DBTablePrefix, continent)
+			query = fmt.Sprintf(`insert into %sarea_tables (name) values ('%s')`, conf.DBTablePrefix, continent)
 
 			ctx, canc := context.WithTimeout(context.Background(), 5*time.Second)
 			defer canc()
@@ -93,7 +93,7 @@ func createNonExistingContinents(db *sql.DB, conf *Config) error {
 			icu_patients int null,
 			hosp_patients int null,
 
-			foreign key (country_code) references %scountries (code),
+			foreign key (country_code) references %slocations (code),
 			constraint uc_cl unique (country_code, last_updated)
 		)`, conf.DBTablePrefix, tableName, conf.DBTablePrefix)
 
@@ -107,12 +107,12 @@ func createNonExistingContinents(db *sql.DB, conf *Config) error {
 }
 
 func createCountriesTable(db *sql.DB, conf *Config) error {
-	query := fmt.Sprintf(`create table if not exists %scountries (
+	query := fmt.Sprintf(`create table if not exists %slocations (
 		code varchar(10) not null primary key,
 		name varchar(70) not null,
 		continent_table int not null,
 
-		foreign key (continent_table) references %scontinent_tables (id)
+		foreign key (continent_table) references %sarea_tables (id)
 	)`, conf.DBTablePrefix, conf.DBTablePrefix)
 
 	_, err := db.Exec(query)
@@ -177,8 +177,8 @@ func insertCountryReports(results *OWIDResults, db *sql.DB, conf *Config) error 
 }
 
 func getTableForCountryCode(countryCode string, db *sql.DB, conf *Config) (string, error) {
-	query := fmt.Sprintf(`select %scontinent_tables.name from %scontinent_tables
-			inner join %scountries on %scontinent_tables.id = %scountries.continent_table and %scountries.code = ?`, conf.DBTablePrefix, conf.DBTablePrefix, conf.DBTablePrefix, conf.DBTablePrefix, conf.DBTablePrefix, conf.DBTablePrefix)
+	query := fmt.Sprintf(`select %sarea_tables.name from %sarea_tables
+			inner join %slocations on %sarea_tables.id = %slocations.continent_table and %slocations.code = ?`, conf.DBTablePrefix, conf.DBTablePrefix, conf.DBTablePrefix, conf.DBTablePrefix, conf.DBTablePrefix, conf.DBTablePrefix)
 
 	row := db.QueryRow(query, countryCode)
 
@@ -214,11 +214,12 @@ func updateCountries(results *OWIDResults, db *sql.DB, conf *Config) error {
 			return errors.New("no continent found for country " + loc.Name)
 		}
 
-		query := fmt.Sprintf(`insert into %scountries (code, name, continent_table) values ('%s', '%s', '%d') on duplicate key update code=code`,
+		query := fmt.Sprintf(`insert into %slocations (code, name, continent_table) values ('%s', '%s', '%d') on duplicate key update name='%s'`,
 			conf.DBTablePrefix,
 			strings.Replace(loc.CountryCode, "'", "\\'", -1),
 			strings.Replace(loc.Name, "'", "\\'", -1),
-			continentId)
+			continentId,
+			strings.Replace(loc.Name, "'", "\\'", -1))
 
 		_, err = db.Exec(query)
 		if err != nil {
@@ -230,7 +231,7 @@ func updateCountries(results *OWIDResults, db *sql.DB, conf *Config) error {
 }
 
 func getContinentTables(db *sql.DB, conf *Config) (map[int]string, error) {
-	query := fmt.Sprintf("select * from %scontinent_tables", conf.DBTablePrefix)
+	query := fmt.Sprintf("select * from %sarea_tables", conf.DBTablePrefix)
 
 	ctx, canc := context.WithTimeout(context.Background(), 10*time.Second)
 	defer canc()
