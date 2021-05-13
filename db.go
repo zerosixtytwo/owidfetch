@@ -22,9 +22,9 @@ func init() {
 
 func updateContinentTables(db *sql.DB, reports *owid.Results) error {
 
-	q := "create table if not exists `owid_areas` (" +
-		"id int not null primary key AUTO_INCREMENT," +
-		"name varchar(30) not null)"
+	q := "CREATE TABLE IF NOT EXISTS `owid_areas` (" +
+		"id INT NOT NULL PRIMARY KEY AUTO_INCREMENT," +
+		"name VARCHAR(30) not null)"
 
 	_, err := db.Exec(q)
 	if err != nil {
@@ -41,7 +41,7 @@ func updateContinentTables(db *sql.DB, reports *owid.Results) error {
 		presentContinents = append(presentContinents, c)
 	}
 
-	q = "insert into `owid_areas` (name) values('%continent%')"
+	q = "INSERT INTO `owid_areas` (name) VALUES('%continent%')"
 	genericQT.template = q
 
 	for _, res := range *reports {
@@ -91,23 +91,23 @@ func createNonExistingContinents(db *sql.DB) error {
 		return err
 	}
 
-	q := "create table if not exists `owid_details_%continent_table_name%` (" +
-		"country_code varchar(10) not null," +
-		"last_updated datetime not null," +
-		"total_cases int null," +
-		"new_cases int null," +
-		"total_deaths int null," +
-		"new_deaths int null," +
-		"total_tests int null," +
-		"new_tests int null," +
-		"total_vaccinations int null," +
-		"people_vaccinated int null," +
-		"people_fully_vaccinated int null," +
-		"new_vaccinations int null," +
-		"icu_patients int null," +
-		"hosp_patients int null," +
-		"foreign key (country_code) references `owid_locations` (code)," +
-		"constraint uc_cl unique (country_code, last_updated))"
+	q := "CREATE TABLE IF NOT EXISTS `owid_details_%continent_table_name%` (" +
+		"country_code VARCHAR(10) NOT NULL," +
+		"last_updated datetime NOT NULL," +
+		"total_cases INT NULL," +
+		"new_cases INT NULL," +
+		"total_deaths INT NULL," +
+		"new_deaths INT NULL," +
+		"total_tests INT NULL," +
+		"new_tests INT NULL," +
+		"total_vaccinations INT NULL," +
+		"people_vaccinated INT NULL," +
+		"people_fully_vaccinated INT NULL," +
+		"new_vaccinations INT NULL," +
+		"icu_patients INT NULL," +
+		"hosp_patients INT NULL," +
+		"FOREIGN KEY (country_code) REFERENCES `owid_locations` (code)," +
+		"constraint uc_cl UNIQUE (country_code, last_updated))"
 	genericQT.template = q
 
 	for _, tableName := range continentTables {
@@ -126,11 +126,11 @@ func createNonExistingContinents(db *sql.DB) error {
 }
 
 func createCountriesTable(db *sql.DB) error {
-	q := "create table if not exists `owid_locations` (" +
-		"code varchar(10) not null primary key," +
-		"name varchar(70) not null," +
-		"continent_table int not null," +
-		"foreign key (continent_table) references `owid_areas` (id))"
+	q := "CREATE TABLE IF NOT EXISTS `owid_locations` (" +
+		"code VARCHAR(10) NOT NULL PRIMARY KEY," +
+		"name VARCHAR(70) NOT NULL," +
+		"continent_table INT NOT NULL," +
+		"FOREIGN KEY (continent_table) REFERENCES `owid_areas` (id))"
 
 	_, err := db.Exec(q)
 	if err != nil {
@@ -146,12 +146,12 @@ func insertCountryReports(results *owid.Results, db *sql.DB) error {
 		return err
 	}
 
-	q := "insert into %table_name% (country_code,last_updated,total_cases,new_cases,total_deaths,new_deaths,total_tests," +
+	q := "INSERT INTO %table_name% (country_code,last_updated,total_cases,new_cases,total_deaths,new_deaths,total_tests," +
 		"new_tests,total_vaccinations,people_vaccinated,people_fully_vaccinated,new_vaccinations,icu_patients,hosp_patients) " +
-		"values ('%country_code%',now(),'%total_cases%','%new_cases%','%total_deaths%','%new_deaths%'," +
+		"VALUES ('%country_code%',now(),'%total_cases%','%new_cases%','%total_deaths%','%new_deaths%'," +
 		"'%total_tests%','%new_tests%','%total_vaccinations%','%people_vaccinated%','%people_fully_vaccinated%'," +
 		"'%new_vaccinations%','%icu_patients%','%hosp_patients%') " +
-		"on duplicate key update " +
+		"ON DUPLICATE KEY UPDATE " +
 		"total_cases = '%total_cases%',new_cases = '%new_cases%',total_deaths = '%total_deaths%'," +
 		"new_deaths = '%new_deaths%',total_tests = '%total_tests%',new_tests = '%new_tests%'," +
 		"total_vaccinations = '%total_vaccinations%',people_vaccinated = '%people_vaccinated%'," +
@@ -198,15 +198,15 @@ func insertCountryReports(results *owid.Results, db *sql.DB) error {
 
 func getTableForCountryCode(countryCode string, db *sql.DB) (string, error) {
 
-	q := "select `owid_areas`.name from `owid_areas` " +
-		"inner join `owid_locations` on `owid_areas`.id = `owid_locations`.continent_table and `owid_locations`.code = ?"
+	q := "SELECT `owid_areas`.name FROM `owid_areas` " +
+		"INNER JOIN `owid_locations` ON `owid_areas`.id = `owid_locations`.continent_table and `owid_locations`.code = ?"
 
 	row := db.QueryRow(q, countryCode)
 
 	var tableName string
 	err := row.Scan(&tableName)
 	if err != nil {
-		return "", errors.New("failed obtaining the table name for country code: \"" + countryCode + "\"")
+		return "", errors.New("failed obtaining the TABLE name for country code: \"" + countryCode + "\"")
 	}
 
 	return tableName, nil
@@ -220,9 +220,9 @@ func updateCountries(results *owid.Results, db *sql.DB) error {
 		return err
 	}
 
-	q := "insert into `owid_locations` (code, name, continent_table) " +
-		"values ('%code%', '%name%', '%continent_table%') " +
-		"on duplicate key update name = '%name%'"
+	q := "INSERT INTO `owid_locations` (code, name, continent_table) " +
+		"VALUES ('%code%', '%name%', '%continent_table%') " +
+		"ON DUPLICATE KEY UPDATE name = '%name%'"
 	genericQT.template = q
 
 	for _, loc := range locations {
@@ -261,7 +261,7 @@ func updateCountries(results *owid.Results, db *sql.DB) error {
 }
 
 func getContinentTables(db *sql.DB) (map[int]string, error) {
-	query := "select * from `owid_areas`"
+	query := "SELECT * FROM `owid_areas`"
 
 	ctx, canc := context.WithTimeout(context.Background(), 10*time.Second)
 	defer canc()
