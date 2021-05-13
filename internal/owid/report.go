@@ -1,5 +1,13 @@
 package owid
 
+import (
+	"errors"
+	"fmt"
+	"reflect"
+	"regexp"
+	"strings"
+)
+
 type Report struct {
 	Continent                         string  `json:"continent"`
 	Location                          string  `json:"location"`
@@ -63,3 +71,101 @@ type Report struct {
 
 // map[country_code]country_data
 type Results map[string]Report
+
+// The following functions are very context specific and should not be
+// used in other environments haha
+
+func (r Report) ToSQLNames(ii int) (string, error) {
+	var sql = ""
+
+	v := reflect.ValueOf(r)
+	nf := v.NumField()
+	if ii >= nf {
+		return "", errors.New("invalid initial index passed")
+	}
+
+	for i := ii; i < nf; i++ {
+		n := reflect.TypeOf(r).Field(i)
+		sql += n.Tag.Get("json")
+		if i < nf-1 {
+			sql += ","
+		}
+	}
+
+	return sql, nil
+}
+
+func (r Report) ToSQLValues(ii int) (string, error) {
+	var sql = ""
+
+	v := reflect.TypeOf(r)
+	nf := v.NumField()
+	if ii >= nf {
+		return "", errors.New("invalid initial index passed")
+	}
+
+	for i := ii; i < nf; i++ {
+		v := reflect.ValueOf(r).Field(i)
+
+		sql += fmt.Sprintf("'%v'", v)
+		if i < nf-1 {
+			sql += ","
+		}
+	}
+
+	return sql, nil
+}
+
+func (r Report) ToSQLSet(ii int) (string, error) {
+	var sql = ""
+
+	v := reflect.TypeOf(r)
+	nf := v.NumField()
+	if ii >= nf {
+		return "", errors.New("invalid initial index passed")
+	}
+
+	for i := ii; i < nf; i++ {
+		vv := reflect.ValueOf(r).Field(i)
+		vt := reflect.TypeOf(r).Field(i)
+
+		sql += fmt.Sprintf("`%s` = '%v'", vt.Tag.Get("json"), vv)
+		if i < nf-1 {
+			sql += ","
+		}
+	}
+
+	return sql, nil
+}
+
+func (r Report) ToSQLNamesCreate(ii int) (string, error) {
+	var sql = ""
+
+	v := reflect.ValueOf(r)
+	nf := v.NumField()
+	if ii >= nf {
+		return "", errors.New("invalid initial index passed")
+	}
+
+	for i := ii; i < nf; i++ {
+		n := reflect.TypeOf(r).Field(i)
+		v := reflect.ValueOf(r).Field(i)
+
+		sql += n.Tag.Get("json")
+
+		vp := strings.ReplaceAll(fmt.Sprintf("%v", v), ".", "")
+		rx := regexp.MustCompile("^[0-9]+$")
+		isNum := rx.MatchString(vp)
+		if !isNum {
+			sql += " VARCHAR(30) NULL"
+		} else {
+			sql += " FLOAT NULL"
+		}
+
+		if i < nf-1 {
+			sql += ","
+		}
+	}
+
+	return sql, nil
+}

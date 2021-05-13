@@ -71,7 +71,7 @@ func updateContinentTables(db *sql.DB, reports *owid.Results) error {
 		}
 	}
 
-	err = createNonExistingContinents(db)
+	err = createNonExistingContinents(db, reports)
 	if err != nil {
 		return err
 	}
@@ -79,7 +79,7 @@ func updateContinentTables(db *sql.DB, reports *owid.Results) error {
 	return nil
 }
 
-func createNonExistingContinents(db *sql.DB) error {
+func createNonExistingContinents(db *sql.DB, reports *owid.Results) error {
 
 	continentTables, err := getContinentTables(db)
 	if err != nil {
@@ -91,21 +91,16 @@ func createNonExistingContinents(db *sql.DB) error {
 		return err
 	}
 
+	sqlNamesCreate, err := (*reports)["USA"].ToSQLNamesCreate(4)
+	if err != nil {
+		return err
+	}
+
 	q := "CREATE TABLE IF NOT EXISTS `owid_details_%continent_table_name%` (" +
 		"country_code VARCHAR(10) NOT NULL," +
-		"last_updated datetime NOT NULL," +
-		"total_cases INT NULL," +
-		"new_cases INT NULL," +
-		"total_deaths INT NULL," +
-		"new_deaths INT NULL," +
-		"total_tests INT NULL," +
-		"new_tests INT NULL," +
-		"total_vaccinations INT NULL," +
-		"people_vaccinated INT NULL," +
-		"people_fully_vaccinated INT NULL," +
-		"new_vaccinations INT NULL," +
-		"icu_patients INT NULL," +
-		"hosp_patients INT NULL," +
+		"last_updated DATETIME NOT NULL," +
+		"total_cases FLOAT NULL," +
+		sqlNamesCreate + "," +
 		"FOREIGN KEY (country_code) REFERENCES `owid_locations` (code)," +
 		"constraint uc_cl UNIQUE (country_code, last_updated))"
 	genericQT.template = q
@@ -146,18 +141,17 @@ func insertCountryReports(results *owid.Results, db *sql.DB) error {
 		return err
 	}
 
-	q := "INSERT INTO %table_name% (country_code,last_updated,total_cases,new_cases,total_deaths,new_deaths,total_tests," +
-		"new_tests,total_vaccinations,people_vaccinated,people_fully_vaccinated,new_vaccinations,icu_patients,hosp_patients) " +
-		"VALUES ('%country_code%',now(),'%total_cases%','%new_cases%','%total_deaths%','%new_deaths%'," +
-		"'%total_tests%','%new_tests%','%total_vaccinations%','%people_vaccinated%','%people_fully_vaccinated%'," +
-		"'%new_vaccinations%','%icu_patients%','%hosp_patients%') " +
-		"ON DUPLICATE KEY UPDATE " +
-		"total_cases = '%total_cases%',new_cases = '%new_cases%',total_deaths = '%total_deaths%'," +
-		"new_deaths = '%new_deaths%',total_tests = '%total_tests%',new_tests = '%new_tests%'," +
-		"total_vaccinations = '%total_vaccinations%',people_vaccinated = '%people_vaccinated%'," +
-		"people_fully_vaccinated = '%people_fully_vaccinated%'," +
-		"new_vaccinations = '%new_vaccinations%',icu_patients = '%icu_patients%'," +
-		"hosp_patients = '%hosp_patients%'"
+	// Here "USA" is just a random country code i use, since those functions
+	// use reflection to get the properties of the struct contained in one
+	// of the map indexes.
+	sqlNames, err := (*results)["USA"].ToSQLNames(3)
+	if err != nil {
+		return err
+	}
+
+	q := "INSERT INTO %table_name% (country_code, last_updated, " + sqlNames + ") " +
+		"VALUES ('%country_code%',now(),%sql_values%) " +
+		"ON DUPLICATE KEY UPDATE %sql_set%"
 
 	genericQT.template = q
 
@@ -168,21 +162,21 @@ func insertCountryReports(results *owid.Results, db *sql.DB) error {
 			continue
 		}
 
+		sqlValues, err := report.ToSQLValues(3)
+		if err != nil {
+			return err
+		}
+
+		sqlSet, err := report.ToSQLSet(3)
+		if err != nil {
+			return err
+		}
+
 		genericQT.WithValues(&map[string]string{
-			"country_code":            countryCode,
-			"table_name":              "owid_details_" + tableName,
-			"total_cases":             fmt.Sprint(report.TotalCases),
-			"new_cases":               fmt.Sprint(report.NewCases),
-			"total_deaths":            fmt.Sprint(report.TotalDeaths),
-			"new_deaths":              fmt.Sprint(report.NewDeaths),
-			"total_tests":             fmt.Sprint(report.TotalTests),
-			"new_tests":               fmt.Sprint(report.NewTests),
-			"total_vaccinations":      fmt.Sprint(report.TotalVaccinations),
-			"people_vaccinated":       fmt.Sprint(report.PeopleVaccinated),
-			"people_fully_vaccinated": fmt.Sprint(report.PeopleFullyVaccinated),
-			"new_vaccinations":        fmt.Sprint(report.NewVaccinations),
-			"icu_patients":            fmt.Sprint(report.IcuPatients),
-			"hosp_patients":           fmt.Sprint(report.HospPatients),
+			"country_code": countryCode,
+			"table_name":   "owid_details_" + tableName,
+			"sql_values":   sqlValues,
+			"sql_set":      sqlSet,
 		})
 
 		query := genericQT.Execute()
