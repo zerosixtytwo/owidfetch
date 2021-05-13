@@ -8,6 +8,8 @@ import (
 	"log"
 	"strings"
 	"time"
+
+	"github.com/zerosixtytwo/owidfetch/internal/owid"
 )
 
 var (
@@ -18,18 +20,11 @@ func init() {
 	genericQT = newQueryTemplate("0")
 }
 
-func updateContinentTables(db *sql.DB, reports *OWIDResults) error {
+func updateContinentTables(db *sql.DB, reports *owid.Results) error {
 
-	q := "create table if not exists %area_tables% (" +
+	q := "create table if not exists `owid_areas` (" +
 		"id int not null primary key AUTO_INCREMENT," +
 		"name varchar(30) not null)"
-
-	genericQT.template = q
-	genericQT.WithValues(&map[string]string{
-		"area_tables": config.DBTablePrefix + "area_tables",
-	})
-
-	q = genericQT.Execute()
 
 	_, err := db.Exec(q)
 	if err != nil {
@@ -46,10 +41,8 @@ func updateContinentTables(db *sql.DB, reports *OWIDResults) error {
 		presentContinents = append(presentContinents, c)
 	}
 
-	q = "insert into %area_tables% (name) values('%continent%')"
-
+	q = "insert into `owid_areas` (name) values('%continent%')"
 	genericQT.template = q
-	genericQT.SetValue("area_tables", config.DBTablePrefix+"area_tables")
 
 	for _, res := range *reports {
 		continent := res.Continent
@@ -57,7 +50,7 @@ func updateContinentTables(db *sql.DB, reports *OWIDResults) error {
 			continent = res.Location
 		}
 
-		continent = strings.ReplaceAll(continent, " ", "_")
+		continent = strings.ToLower(strings.ReplaceAll(continent, " ", "_"))
 
 		continentExists := stringSliceContains(presentContinents, continent)
 
@@ -98,7 +91,7 @@ func createNonExistingContinents(db *sql.DB) error {
 		return err
 	}
 
-	q := "create table if not exists %continent_table_name% (" +
+	q := "create table if not exists `owid_details_%continent_table_name%` (" +
 		"country_code varchar(10) not null," +
 		"last_updated datetime not null," +
 		"total_cases int null," +
@@ -113,15 +106,13 @@ func createNonExistingContinents(db *sql.DB) error {
 		"new_vaccinations int null," +
 		"icu_patients int null," +
 		"hosp_patients int null," +
-		"foreign key (country_code) references %locations% (code)," +
+		"foreign key (country_code) references `owid_locations` (code)," +
 		"constraint uc_cl unique (country_code, last_updated))"
 	genericQT.template = q
 
-	genericQT.SetValue("locations", config.DBTablePrefix+"locations")
-
 	for _, tableName := range continentTables {
 
-		genericQT.SetValue("continent_table_name", config.DBTablePrefix+tableName)
+		genericQT.SetValue("continent_table_name", tableName)
 
 		query := genericQT.Execute()
 
@@ -135,17 +126,11 @@ func createNonExistingContinents(db *sql.DB) error {
 }
 
 func createCountriesTable(db *sql.DB) error {
-	q := "create table if not exists %locations% (" +
+	q := "create table if not exists `owid_locations` (" +
 		"code varchar(10) not null primary key," +
 		"name varchar(70) not null," +
 		"continent_table int not null," +
-		"foreign key (continent_table) references %area_tables% (id))"
-
-	genericQT.template = q
-	genericQT.SetValue("area_tables", config.DBTablePrefix+"area_tables")
-	genericQT.SetValue("locations", config.DBTablePrefix+"locations")
-
-	q = genericQT.Execute()
+		"foreign key (continent_table) references `owid_areas` (id))"
 
 	_, err := db.Exec(q)
 	if err != nil {
@@ -155,7 +140,7 @@ func createCountriesTable(db *sql.DB) error {
 	return nil
 }
 
-func insertCountryReports(results *OWIDResults, db *sql.DB) error {
+func insertCountryReports(results *owid.Results, db *sql.DB) error {
 	err := updateCountries(results, db)
 	if err != nil {
 		return err
@@ -185,7 +170,7 @@ func insertCountryReports(results *OWIDResults, db *sql.DB) error {
 
 		genericQT.WithValues(&map[string]string{
 			"country_code":            countryCode,
-			"table_name":              tableName,
+			"table_name":              "owid_details_" + tableName,
 			"total_cases":             fmt.Sprint(report.TotalCases),
 			"new_cases":               fmt.Sprint(report.NewCases),
 			"total_deaths":            fmt.Sprint(report.TotalDeaths),
@@ -213,16 +198,8 @@ func insertCountryReports(results *OWIDResults, db *sql.DB) error {
 
 func getTableForCountryCode(countryCode string, db *sql.DB) (string, error) {
 
-	q := "select %area_tables%.name from %area_tables% " +
-		"inner join %locations% on %area_tables%.id = %locations%.continent_table and %locations%.code = ?"
-
-	qt := newQueryTemplate(q)
-
-	qt.template = q
-	qt.SetValue("area_tables", config.DBTablePrefix+"area_tables")
-	qt.SetValue("locations", config.DBTablePrefix+"locations")
-
-	q = qt.Execute()
+	q := "select `owid_areas`.name from `owid_areas` " +
+		"inner join `owid_locations` on `owid_areas`.id = `owid_locations`.continent_table and `owid_locations`.code = ?"
 
 	row := db.QueryRow(q, countryCode)
 
@@ -232,10 +209,10 @@ func getTableForCountryCode(countryCode string, db *sql.DB) (string, error) {
 		return "", errors.New("failed obtaining the table name for country code: \"" + countryCode + "\"")
 	}
 
-	return config.DBTablePrefix + tableName, nil
+	return tableName, nil
 }
 
-func updateCountries(results *OWIDResults, db *sql.DB) error {
+func updateCountries(results *owid.Results, db *sql.DB) error {
 	locations := extractLocations(results)
 
 	presentContinents, err := getContinentTables(db)
@@ -243,11 +220,10 @@ func updateCountries(results *OWIDResults, db *sql.DB) error {
 		return err
 	}
 
-	q := "insert into %locations% (code, name, continent_table) " +
+	q := "insert into `owid_locations` (code, name, continent_table) " +
 		"values ('%code%', '%name%', '%continent_table%') " +
 		"on duplicate key update name = '%name%'"
 	genericQT.template = q
-	genericQT.SetValue("locations", config.DBTablePrefix+"locations")
 
 	for _, loc := range locations {
 		continent := getContinentTableName(loc.Continent)
@@ -285,7 +261,7 @@ func updateCountries(results *OWIDResults, db *sql.DB) error {
 }
 
 func getContinentTables(db *sql.DB) (map[int]string, error) {
-	query := fmt.Sprintf("select * from %sarea_tables", config.DBTablePrefix)
+	query := "select * from `owid_areas`"
 
 	ctx, canc := context.WithTimeout(context.Background(), 10*time.Second)
 	defer canc()

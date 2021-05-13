@@ -1,6 +1,11 @@
 package main
 
-import "strings"
+import (
+	"strings"
+
+	"github.com/zerosixtytwo/owidfetch/internal/model"
+	"github.com/zerosixtytwo/owidfetch/internal/owid"
+)
 
 func stringSliceContains(subject []string, search string) bool {
 	for _, x := range subject {
@@ -12,14 +17,14 @@ func stringSliceContains(subject []string, search string) bool {
 	return false
 }
 
-func extractLocations(results *OWIDResults) []Location {
-	locations := make([]Location, 0)
+func extractLocations(results *owid.Results) []model.Location {
+	locations := make([]model.Location, 0)
 
 	for countryCode, locationData := range *results {
 		if len(locationData.Continent) == 0 {
 			locationData.Continent = locationData.Location
 		}
-		c := &Location{
+		c := &model.Location{
 			CountryCode: countryCode,
 			Continent:   locationData.Continent,
 			Name:        locationData.Location,
@@ -31,5 +36,5 @@ func extractLocations(results *OWIDResults) []Location {
 }
 
 func getContinentTableName(continent string) string {
-	return strings.ReplaceAll(continent, " ", "_")
+	return strings.ToLower(strings.ReplaceAll(continent, " ", "_"))
 }

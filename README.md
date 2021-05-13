@@ -21,4 +21,4 @@ packing it into easy to parse formats and updating data on a hourly basis
 go to the [OWID](https://github.com/owid) group, thank you for making
 access to crucial information easier.
 _______________________________________________________________________
-__Current version:__ 1.00, __Status:__ Stable, Alpha.
+__Current version:__ 1.25, __Status:__ Stable, Alpha.
