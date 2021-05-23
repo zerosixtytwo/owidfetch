@@ -154,6 +154,8 @@ func (r Report) ToSQLNamesCreate(ii int) (string, error) {
 		sql += n.Tag.Get("json")
 
 		vp := strings.ReplaceAll(fmt.Sprintf("%v", v), ".", "")
+		// Remove 'e+'s from the number.
+		vp = strings.ReplaceAll(vp, "e+", "")
 		rx := regexp.MustCompile("^[0-9]+$")
 		isNum := rx.MatchString(vp)
 		if !isNum {
